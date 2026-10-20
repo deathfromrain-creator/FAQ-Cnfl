@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMElEQVR42mNk+M9QDwMszGgcoG6gX6gB9A90wHDoG+gAasBw6BvoAGrAcOgb6AAC6Fshmby3KwAAAABJRU5ErkJggg==">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>База Знаний</title>
+    <style>
+/* CSS-переменные для легкого переключения тем */
+        :root {
+            --bg-app: #f8fafc;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --accent: #2563eb;
+            --hover: #f1f5f9;
+        }
+
+/* Темная тема */
+        [data-theme="dark"] {
+            --bg-app: #0f172a;
+            --bg-sidebar: #1e293b;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --accent: #3b82f6;
+            --hover: #334155;
+        }
+
+/* Базовые стили сетки */
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; letter-spacing: -0.01em; }
+        body { background: var(--bg-app); color: var(--text-main); height: 100vh; overflow: hidden; transition: background 0.2s, color 0.2s; }
+        
+        .app-container { display: flex; height: 100vh; }
+
+/* Левая панель */
+        .sidebar { width: 300px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 24px 20px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-header h2 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+        .search-bar { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); background: var(--bg-app); color: var(--text-main); border-radius: 6px; font-size: 14px; }
+        
+        .menu-tree { flex: 1; overflow-y: auto; padding: 15px 10px; }
+        .sidebar-footer { padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 8px; }
+
+/* Центральная панель */
+        .main-content { flex: 1; overflow-y: auto; padding: 40px; background: var(--bg-app); }
+        .article-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; }
+.article-header h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-main); }
+        .article-body { font-size: 16px; line-height: 1.6; white-space: pre-wrap; }
+
+/* Правая панель редактора (пока скрыта) */
+        .editor-panel { width: 400px; background: var(--bg-sidebar); border-left: 1px solid var(--border-color); padding: 30px 20px; display: flex; flex-direction: column; gap: 16px; }
+        .editor-panel.hidden { display: none; }
+        .editor-panel h2 { font-size: 18px; font-weight: 600; }
+
+/* Инпуты и кнопки */
+        input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); background: var(--bg-app); color: var(--text-main); border-radius: 6px; font-size: 14px; }
+        textarea { flex: 1; resize: none; min-height: 200px; }
+        
+        .btn { padding: 8px 14px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.1s; }
+        .btn:hover { background: var(--hover); }
+        .btn-primary { background: var(--accent); color: white; border: none; }
+        .btn-primary:hover { opacity: 0.9; }
+
+        /* Переключатель тем в шапке */
+        .theme-toggle { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; }
+/* Стили для дерева папок и статей в меню */
+        .folder { margin-bottom: 8px; user-select: none; }
+        .folder-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; color: var(--text-main); }
+        .folder-header:hover { background: var(--hover); }
+        .folder-title { display: flex; align-items: center; gap: 8px; }
+        .folder-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; }
+        .folder-arrow.rotated { transform: rotate(-90deg); }
+        
+        .folder-content { padding-left: 20px; margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+        .folder-content.collapsed { display: none; }
+        
+        .doc-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .doc-item:hover { background: var(--hover); color: var(--text-main); }
+        .doc-item.active { background: var(--accent); color: white !important; font-weight: 500; }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+
+        <!-- 1. ЛЕВАЯ ПАНЕЛЬ: НАВИГАЦИЯ -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h2>Наш FAQ</h2>
+                    <!-- Кнопка переключения темы с аккуратными SVG -->
+                    <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px;">
+                        <!-- Иконка солнца -->
+                        <svg id="sunIcon" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+                        <!-- Иконка луны -->
+                        <svg id="moonIcon" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+                    </button>
+                </div>
+                <input type="text" id="searchBar" class="search-bar" placeholder="Поиск по инструкциям...">
+            </div>
+            
+            <nav class="menu-tree" id="menuTree">
+                <!-- Сюда JS будет вставлять папки и статьи -->
+            </nav>
+<div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 8px;">
+    <button class="btn btn-primary" style="width: 100%;" onclick="openNewArticleEditor()">+ Новая статья</button>
+    <button class="btn" style="width: 100%;" onclick="exportEngine()">💾 Экспорт index.html</button>
+</div>
+        </aside>
+
+        <!-- 2. ЦЕНТРАЛЬНАЯ ПАНЕЛЬ: ЧТЕНИЕ СТАТЬИ -->
+        <main class="main-content" id="viewSection">
+            <div class="article-header">
+                <h1 id="viewTitle">Добро пожаловать</h1>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" onclick="openEditEditor()">Редактировать</button>
+                    <button class="btn" style="color: #ef4444;" onclick="deleteCurrentArticle()">Удалить</button>
+                </div>
+            </div>
+            <div class="article-body" id="viewBody">Выберите нужную папку или статью в левом меню для начала работы. Все изменения сохраняются локально.</div>
+        </main>
+
+        <!-- 3. ПРАВАЯ ПАНЕЛЬ: РЕДАКТОР -->
+        <section class="editor-panel hidden" id="editorSection">
+            <h2 id="editorHeadline">Новая статья</h2>
+            <input type="text" id="inputTitle" placeholder="Название статьи">
+            <input type="text" id="inputCategory" placeholder="Категория / Название папки">
+            <textarea id="inputBody" placeholder="Просто пишите текст инструкции здесь..."></textarea>
+            <div style="display: flex; gap: 8px; margin-top: auto;">
+                <button class="btn btn-primary" style="flex: 1;" onclick="saveArticle()">Сохранить</button>
+                <button class="btn" style="flex: 1;" onclick="closeEditor()">Отмена</button>
+            </div>
+        </section>
+
+    </div>
+    <script>
+        // Базовые демо-данные (статьи и папки)
+        let rawDatabase = [
+            { id: "1", title: "Быстрый старт работы", category: "Инструкции", body: "Привет! Это наша новая база знаний.\n\nЗдесь нет сложного маркдауна — просто пишите текст, как в обычном блокноте.\n\nВсе изменения применяются на лету, а папки слева можно сворачивать кликом по их названию." },
+            { id: "2", title: "Доступы к тестовым стендам", category: "Инструкции", body: "Тест-1\nЛогин: stage_user\nПароль: 12345\n\nТест-2\nЛогин: qa_admin\nПароль: qwerty" },
+            { id: "3", title: "Полезные ссылки отдела", category: "Ссылки", body: "1. Внутренний портал компании\n2. Ссылка на макеты в Figma\n3. Чат техподдержки" }
+        ];
+
+        let currentArticles = [...rawDatabase];
+        let activeArticleId = null;
+        let collapsedFolders = {};
+
+        // 1. ЛОГИКА СМЕНЫ ТЕМЫ
+        function updateThemeIcons(theme) {
+            const sun = document.getElementById('sunIcon');
+            const moon = document.getElementById('moonIcon');
+            if (theme === 'dark') {
+                sun.classList.remove('hidden');
+                moon.classList.add('hidden');
+            } else {
+                sun.classList.add('hidden');
+                moon.classList.remove('hidden');
+            }
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('faq-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcons(savedTheme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('faq-theme', newTheme);
+            updateThemeIcons(newTheme);
+        }
+
+        // 2. ОТРИСОВКА ДЕРЕВА ПАПОК И СТАТЕЙ (С КРАСИВЫМИ SVG)
+        function renderMenuTree() {
+            const container = document.getElementById('menuTree');
+            container.innerHTML = "";
+
+            const groups = {};
+            currentArticles.forEach(art => {
+                if (!groups[art.category]) groups[art.category] = [];
+                groups[art.category].push(art);
+            });
+
+            for (const catName in groups) {
+                const folderDiv = document.createElement('div');
+                folderDiv.className = 'folder';
+
+                const isCollapsed = collapsedFolders[catName] || false;
+
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+                header.innerHTML = `
+                    <div class="folder-title" style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"></path></svg>
+                        <span>${catName}</span>
+                    </div>
+                    <div class="folder-arrow ${isCollapsed ? 'rotated' : ''}" style="display: flex; align-items: center;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                `;
+                header.onclick = () => toggleFolder(catName);
+
+                const content = document.createElement('div');
+                content.className = `folder-content ${isCollapsed ? 'collapsed' : ''}`;
+
+                groups[catName].forEach(art => {
+                    const item = document.createElement('div');
+                    item.className = `doc-item ${art.id === activeArticleId ? 'active' : ''}`;
+                    item.innerText = art.title;
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        openArticle(art.id);
+                    };
+                    content.appendChild(item);
+                });
+
+                folderDiv.appendChild(header);
+                folderDiv.appendChild(content);
+                container.appendChild(folderDiv);
+            }
+        }
+
+        function toggleFolder(catName) {
+            collapsedFolders[catName] = !collapsedFolders[catName];
+            renderMenuTree();
+        }
+
+        // 3. ОТКРЫТИЕ СТАТЬИ НА ПРОСМОТР
+        function openArticle(id) {
+            activeArticleId = id;
+            const art = currentArticles.find(a => a.id === id);
+            if (!art) return;
+
+            document.getElementById('viewSection').classList.remove('hidden');
+            document.getElementById('editorSection').classList.add('hidden');
+
+            document.getElementById('viewTitle').innerText = art.title;
+            document.getElementById('viewBody').innerText = art.body;
+
+            renderMenuTree();
+        }
+
+        // Запуск при старте страницы
+        initTheme();
+        renderMenuTree();
+
+        // ФУНКЦИЯ ПОИСКА НА ЛЕТУ
+        function handleSearch() {
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            const items = document.querySelectorAll('.doc-item');
+            
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                // Если текст статьи совпадает с поиском, показываем её, иначе прячем
+                if (text.includes(query)) {
+                    item.style.display = "block";
+                } else {
+                    item.style.display = "none";
+                }
+            });
+        }
+        // 4. ЛОГИКА ПОИСКА (ЧЕРЕЗ ПЕРЕРИСОВКУ МЕНЮ)
+        function handleSearch() {
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            
+            // Фильтруем массив статей по запросу
+            currentArticles = rawDatabase.filter(art => {
+                return art.title.toLowerCase().includes(query) || 
+                       art.body.toLowerCase().includes(query) || 
+                       art.category.toLowerCase().includes(query);
+            });
+            
+            // Если поиск пустой, возвращаем полную базу данных
+            if (!query) currentArticles = [...rawDatabase];
+            
+            // Перерисовываем левое меню с учетом фильтра
+            renderMenuTree();
+        }
+
+        // Привязываем событие к инпуту поиска
+        document.getElementById('searchBar').addEventListener('input', handleSearch);
+        // 5. УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ РЕДАКТОРА
+        
+        // Открытие редактора для создания НОВОЙ статьи
+        function openNewArticleEditor() {
+            activeArticleId = null; // Сбрасываем ID, так как статья новая
+            
+            document.getElementById('editorHeadline').innerText = "Новая статья";
+            document.getElementById('inputTitle').value = "";
+            document.getElementById('inputCategory').value = "Инструкции"; // Папка по умолчанию
+            document.getElementById('inputBody').value = "";
+            
+            // Показываем правую панель редактора
+            document.getElementById('editorSection').classList.remove('hidden');
+        }
+
+        // Открытие редактора для ИЗМЕНЕНИЯ текущей статьи
+        function openEditEditor() {
+            if (!activeArticleId) {
+                alert("Сначала выберите статью для редактирования!");
+                return;
+            }
+            
+            // Ищем данные текущей активной статьи
+            const art = rawDatabase.find(a => a.id === activeArticleId);
+            if (!art) return;
+
+            document.getElementById('editorHeadline').innerText = "Редактирование";
+            document.getElementById('inputTitle').value = art.title;
+            document.getElementById('inputCategory').value = art.category;
+            document.getElementById('inputBody').value = art.body;
+
+            // Показываем правую панель редактора
+            document.getElementById('editorSection').classList.remove('hidden');
+        }
+
+        // Закрытие панели редактора (кнопка Отмена)
+        function closeEditor() {
+            document.getElementById('editorSection').classList.add('hidden');
+        }
+   // 6. СОХРАНЕНИЕ И УДАЛЕНИЕ СТАТЕЙ
+        
+        function saveArticle() {
+            const title = document.getElementById('inputTitle').value.trim() || "Без названия";
+            const category = document.getElementById('inputCategory').value.trim() || "Общее";
+            const body = document.getElementById('inputBody').value;
+
+            if (activeArticleId) {
+                // Если ID есть — обновляем существующую статью в rawDatabase
+                const art = rawDatabase.find(a => a.id === activeArticleId);
+                if (art) {
+                    art.title = title;
+                    art.category = category;
+                    art.body = body;
+                }
+            } else {
+                // Если ID нет — создаем абсолютно новую статью
+                const newId = String(Date.now());
+                const newArticle = { id: newId, title, category, body };
+                
+                rawDatabase.push(newArticle);
+                activeArticleId = newId; // Делаем её активной
+            }
+
+            // Синхронизируем наш поисковый массив с основной базой данных
+            currentArticles = [...rawDatabase];
+            
+            // Сбрасываем строку поиска, чтобы новая папка/статья сразу появилась на экране
+            document.getElementById('searchBar').value = ""; 
+            
+            // Перерисовываем меню, открываем обновленную статью и закрываем редактор
+            renderMenuTree();
+            openArticle(activeArticleId);
+            closeEditor();
+        }
+
+        function deleteCurrentArticle() {
+            if (!activeArticleId) {
+                alert("Выберите статью для удаления!");
+                return;
+            }
+            
+            if (!confirm("Вы уверены, что хотите безвозвратно удалить эту инструкцию?")) return;
+
+            // Вырезаем статью из главной базы данных
+            rawDatabase = rawDatabase.filter(a => a.id !== activeArticleId);
+            currentArticles = [...rawDatabase];
+            activeArticleId = null;
+
+            // Перерисовываем левую панель и сбрасываем центральный экран
+            renderMenuTree();
+            document.getElementById('viewTitle').innerText = "Добро пожаловать";
+            document.getElementById('viewBody').innerText = "Выберите нужную папку или статью в левом меню для начала работы. Все изменения сохраняются локально.";
+            closeEditor();
+        }
+        // 7. СБОРКА И ЭКСПОРТ ОБНОВЛЕННОГО ФАЙЛА INDEX.HTML
+        function exportEngine() {
+            // Превращаем текущую актуальную базу статей в текстовую строку JSON
+            const updatedDatabaseString = JSON.stringify(rawDatabase, null, 4);
+            
+            // Получаем весь HTML-код открытой страницы в виде одной большой строки
+            let currentHtmlCode = document.documentElement.outerHTML;
+
+            // Находим регулярным выражением строку объявления старого массива rawDatabase в коде
+            const regexSearch = /let rawDatabase = \[\s*[\s\S]*?\];/;
+            // Формируем новую строку со свежими данными для подстановки
+            const replacementString = `let rawDatabase = ${updatedDatabaseString};`;
+            
+            // Заменяем старую базу на новую и собираем валидный файл
+            let updatedHtmlCode = "<!DOCTYPE html>\n<html lang=\"ru\">\n" + currentHtmlCode.replace(regexSearch, replacementString) + "\n</html>";
+
+            // Создаем временную ссылку в браузере и инициируем скачивание готового файла
+            const blobFile = new Blob([updatedHtmlCode], { type: "text/html;charset=utf-8" });
+            const tempAnchor = document.createElement("a");
+            tempAnchor.href = URL.createObjectURL(blobFile);
+            tempAnchor.download = "index.html"; // Имя скачиваемого файла
+            
+            document.body.appendChild(tempAnchor);
+            tempAnchor.click();
+            document.body.removeChild(tempAnchor);
+        }
+
+</script>
+</body>
+</html>
